@@ -1,0 +1,40 @@
+/* Kindle-optimized global styles — grayscale, high-contrast, readable */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Base font size: 17px gives good readability on a 300 dpi 6" Kindle screen */
+  font-size: 17px;
+  /* Kindle Paperwhite is roughly 600 CSS px wide in landscape/portrait */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  /* System UI font — clean, no serifs, renders well on e-ink */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  line-height: 1.4;
+  /* Prevent over-eager Kindle text reflow */
+  overflow-x: hidden;
+}
+
+/* Remove default link styling except underline */
+a {
+  color: #000;
+}
+
+/* Reduce motion — Kindle doesn't animate well */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,25 @@
+<section class="alerts-section">
+  <h2 class="alerts-heading">Service Alerts</h2>
+
+  @if (loading() && visibleAlerts().length === 0) {
+    <p class="alerts-loading">Loading alerts...</p>
+  } @else if (visibleAlerts().length === 0) {
+    <p class="no-alerts">No active service alerts.</p>
+  } @else {
+    @for (alert of visibleAlerts(); track alert.id) {
+      <div class="alert-item">
+        @if (alert.affectedRoutes.length > 0) {
+          <div class="alert-routes">
+            @for (route of alert.affectedRoutes; track route) {
+              <span class="route-badge">{{ route }}</span>
+            }
+          </div>
+        }
+        <p class="alert-header">{{ alert.header }}</p>
+        @if (alert.description && alert.description !== alert.header) {
+          <p class="alert-desc">{{ alert.description }}</p>
+        }
+      </div>
+    }
+  }
+</section>

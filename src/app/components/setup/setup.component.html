@@ -1,0 +1,93 @@
+<div class="setup">
+  <h1 class="setup-title">MTA Kindle Board</h1>
+  <p class="setup-subtitle">No stops configured. Add query parameters to your URL to get started.</p>
+
+  <section class="setup-section">
+    <h2>Quick Start</h2>
+    <p>Add these parameters to the URL:</p>
+    <table class="param-table">
+      <thead>
+        <tr><th>Param</th><th>Description</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>subway</code></td>
+          <td>Subway GTFS stop IDs (comma-separated)</td>
+          <td><code>R16N,R16S</code></td>
+        </tr>
+        <tr>
+          <td><code>bus</code></td>
+          <td>Bus stop IDs (comma-separated)</td>
+          <td><code>308984</code></td>
+        </tr>
+        <tr>
+          <td><code>walk</code></td>
+          <td>Walk time in minutes per stop</td>
+          <td><code>R16N:5,308984:8</code></td>
+        </tr>
+        <tr>
+          <td><code>labels</code></td>
+          <td>Custom display name per stop</td>
+          <td><code>R16N:Times Sq NB</code></td>
+        </tr>
+        <tr>
+          <td><code>n</code></td>
+          <td>Max arrivals per route (default: 4)</td>
+          <td><code>4</code></td>
+        </tr>
+        <tr>
+          <td><code>busKey</code></td>
+          <td>MTA Bus Time API key (for bus stops)</td>
+          <td><code>abc123</code></td>
+        </tr>
+        <tr>
+          <td><code>proxy</code></td>
+          <td>CORS proxy URL prefix (required)</td>
+          <td><code>https://corsproxy.io/?url=</code></td>
+        </tr>
+        <tr>
+          <td><code>refresh</code></td>
+          <td>Auto-refresh interval in seconds (default: 60)</td>
+          <td><code>60</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="setup-section">
+    <h2>Example URL</h2>
+    <p class="example-url">{{ exampleUrl }}</p>
+  </section>
+
+  <section class="setup-section">
+    <h2>Finding Stop IDs</h2>
+    <ul>
+      <li><strong>Subway:</strong> Download the MTA GTFS static data from mta.info/developers.
+        Open <code>stops.txt</code> and look up your station. The stop ID ends in <code>N</code> (uptown) or <code>S</code> (downtown).</li>
+      <li><strong>Bus:</strong> Find your stop on the MTA Bus Time map at bustime.mta.info.
+        The numeric stop ID appears in the URL or popup.</li>
+    </ul>
+  </section>
+
+  <section class="setup-section">
+    <h2>CORS Proxy</h2>
+    <p>
+      MTA APIs do not allow direct browser access (CORS). You need a proxy.
+      The simplest free option is <strong>corsproxy.io</strong> — just add
+      <code>&amp;proxy=https://corsproxy.io/?url=</code> to your URL.
+    </p>
+    <p>
+      For a more reliable setup, deploy a free Cloudflare Worker proxy
+      and pass its URL as <code>proxy</code>.
+    </p>
+  </section>
+
+  <section class="setup-section">
+    <h2>Bus API Key</h2>
+    <p>
+      Bus arrivals require a free MTA Bus Time API key.
+      Register at <strong>bustime.mta.info/wiki/Developers/Index</strong>.
+      Subway and alerts work without any key.
+    </p>
+  </section>
+</div>

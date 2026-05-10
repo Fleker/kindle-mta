@@ -1,0 +1,128 @@
+.card {
+  border: 2px solid #000;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-bottom: 2px solid #000;
+  background: #000;
+  color: #fff;
+}
+
+.stop-label {
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+}
+
+.walk-time {
+  font-size: 0.8rem;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
+.card-body {
+  padding: 6px 10px;
+}
+
+.card-body.loading,
+.card-body.empty {
+  color: #555;
+  font-style: italic;
+  padding: 8px 10px;
+}
+
+.card-body.error {
+  color: #000;
+  font-weight: bold;
+  padding: 8px 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    #fff,
+    #fff 4px,
+    #eee 4px,
+    #eee 8px
+  );
+}
+
+.error-icon {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  line-height: 1.1em;
+  text-align: center;
+  border: 2px solid #000;
+  border-radius: 50%;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.route-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.route-row:last-child {
+  border-bottom: none;
+}
+
+.route-badge {
+  display: inline-block;
+  width: 1.8em;
+  height: 1.8em;
+  line-height: 1.8em;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+  border: 2px solid #000;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.arrivals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.arrival-chip {
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+}
+
+.arrival-chip.leave-now {
+  border: 2px solid #000;
+  background: #000;
+  color: #fff;
+  padding: 1px 4px;
+}
+
+.destination {
+  font-size: 0.8rem;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.card-footer {
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  color: #666;
+  border-top: 1px solid #ccc;
+  background: #f7f7f7;
+}
+
+.refreshing {
+  font-style: italic;
+}

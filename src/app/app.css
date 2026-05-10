@@ -1,0 +1,36 @@
+.board {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 8px;
+}
+
+.board-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 3px solid #000;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+}
+
+.board-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.board-updated {
+  font-size: 0.78rem;
+  color: #555;
+}
+
+.board-stops {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-footer {
+  margin-top: 4px;
+}

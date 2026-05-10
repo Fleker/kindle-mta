@@ -1,0 +1,48 @@
+<div class="card">
+  <div class="card-header">
+    <span class="stop-label">{{ stopArrivals().stop.label }}</span>
+    @if (stopArrivals().stop.walkMinutes > 0) {
+      <span class="walk-time">{{ stopArrivals().stop.walkMinutes }} min walk</span>
+    }
+  </div>
+
+  @if (stopArrivals().loading && !stopArrivals().lastUpdated) {
+    <div class="card-body loading">Loading...</div>
+  } @else if (stopArrivals().error) {
+    <div class="card-body error">
+      <span class="error-icon">!</span> {{ stopArrivals().error }}
+    </div>
+  } @else if (stopArrivals().arrivals.length === 0) {
+    <div class="card-body empty">No upcoming arrivals</div>
+  } @else {
+    <div class="card-body">
+      @for (route of routes(); track route) {
+        <div class="route-row">
+          <span class="route-badge">{{ route }}</span>
+          <span class="arrivals-list">
+            @for (arrival of routeGroups().get(route) ?? []; track arrival.arrivalTime.getTime()) {
+              <span
+                class="arrival-chip"
+                [class.leave-now]="shouldLeaveNow(arrival)"
+              >
+                {{ formatArrival(arrival) }}
+              </span>
+            }
+          </span>
+          @if (firstArrival(route); as first) {
+            <span class="destination">{{ first.destination }}</span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (stopArrivals().lastUpdated) {
+    <div class="card-footer">
+      Updated {{ formatTime(stopArrivals().lastUpdated) }}
+      @if (stopArrivals().loading) {
+        <span class="refreshing"> · refreshing...</span>
+      }
+    </div>
+  }
+</div>
