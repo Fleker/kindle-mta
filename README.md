@@ -36,6 +36,16 @@ Open the app and configure your stops via URL query parameters.
 https://your-username.github.io/kindle-mta/?subway=R16N,R16S&bus=308984&walk=R16N:5,R16S:5,308984:8&labels=R16N:Times+Sq+NB,R16S:Times+Sq+SB&n=4&busKey=YOUR_BUS_KEY&proxy=https://corsproxy.io/?url=
 ```
 
+ie.
+
+```
+http://localhost:4201/kindle-mta/?subway=R16N,R16S&bus=308984&walk=R16N:5,R16S:5,308984:8&labels=R16N:Times+Sq+NB,R16S:Times+Sq+SB&n=4&busKey=YOUR_BUS_KEY&proxy=https://corsproxy.io/?url=
+```
+
+```
+http://localhost:4201/?subway=123N,123S&labels=123N:72nd+St,123S:72nd+St,405327:72nd+Crosstown&walk=123N:5,123S:5,405327:5&bus=405237
+```
+
 ## Finding Stop IDs
 
 **Subway stop IDs:**

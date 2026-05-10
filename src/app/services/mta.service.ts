@@ -75,12 +75,15 @@ export class MtaService {
     return this.parseBusFeed(resp, stop);
   }
 
-  /** Fetch all service alerts. Returns empty array on error. */
-  async getAlerts(hasSubway: boolean, hasBus: boolean): Promise<ServiceAlert[]> {
+  /**
+   * Fetch service alerts and filter to only those relevant to the provided
+   * stop IDs (from the query params) or route IDs (from fetched arrivals).
+   * Returns an empty array on error.
+   */
+  async getAlerts(stopIds: Set<string>, routeIds: Set<string>): Promise<ServiceAlert[]> {
     try {
-      const feedPath = hasSubway || hasBus ? ALL_ALERTS_FEED : SUBWAY_ALERTS_FEED;
-      const data = await this.fetchBinary(`${MTA_FEED_BASE}/${feedPath}`);
-      return this.parseAlertsFeed(data);
+      const data = await this.fetchBinary(`${MTA_FEED_BASE}/${ALL_ALERTS_FEED}`);
+      return this.parseAlertsFeed(data, stopIds, routeIds);
     } catch {
       return [];
     }
