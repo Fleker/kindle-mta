@@ -2,6 +2,16 @@ import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Arrival, StopArrivals } from '../../models/transit.model';
 
+function groupByRoute(arrivals: Arrival[]): Map<string, Arrival[]> {
+  const map = new Map<string, Arrival[]>();
+  for (const a of arrivals) {
+    const list = map.get(a.routeName) ?? [];
+    list.push(a);
+    map.set(a.routeName, list);
+  }
+  return map;
+}
+
 @Component({
   selector: 'app-transit-card',
   standalone: true,
@@ -11,42 +21,35 @@ import { Arrival, StopArrivals } from '../../models/transit.model';
 })
 export class TransitCardComponent {
   readonly stopArrivals = input.required<StopArrivals>();
-  readonly walkMinutes = input<number>(0);
 
-  /** Group arrivals by route name. */
-  readonly routeGroups = computed(() => {
-    const map = new Map<string, Arrival[]>();
-    for (const a of this.stopArrivals().arrivals) {
-      const list = map.get(a.routeName) ?? [];
-      list.push(a);
-      map.set(a.routeName, list);
-    }
-    return map;
+  // ── Bidirectional subway ───────────────────────────────────────────────────
+  readonly uptownGroups  = computed(() => groupByRoute(this.stopArrivals().uptown));
+  readonly downtownGroups = computed(() => groupByRoute(this.stopArrivals().downtown));
+
+  /** Unified sorted route list spanning both directions. */
+  readonly allRoutes = computed(() => {
+    const routes = new Set([
+      ...this.uptownGroups().keys(),
+      ...this.downtownGroups().keys(),
+    ]);
+    return [...routes].sort();
   });
 
-  /** Sorted list of route names for display. */
-  readonly routes = computed(() =>
-    [...this.routeGroups().keys()].sort()
-  );
+  // ── Single-direction / bus ─────────────────────────────────────────────────
+  readonly routeGroups = computed(() => groupByRoute(this.stopArrivals().arrivals));
+  readonly routes = computed(() => [...this.routeGroups().keys()].sort());
 
-  /** First arrival for a given route (for destination display). */
-  firstArrival(route: string): Arrival | undefined {
-    return this.routeGroups().get(route)?.[0];
-  }
-
-  /** Format an individual arrival time label. */
+  // ── Helpers ────────────────────────────────────────────────────────────────
   formatArrival(arrival: Arrival): string {
     if (arrival.minutesAway <= 0) return 'Due';
     if (arrival.minutesAway === 1) return '1 min';
     return `${arrival.minutesAway} min`;
   }
 
-  /** Whether the user needs to leave now to catch this train. */
   shouldLeaveNow(arrival: Arrival): boolean {
-    return arrival.minutesAway <= this.walkMinutes();
+    return arrival.minutesAway <= this.stopArrivals().stop.walkMinutes;
   }
 
-  /** Formatted time string for the last update. */
   formatTime(date: Date | null): string {
     if (!date) return '';
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });

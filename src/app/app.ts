@@ -34,11 +34,12 @@ export class App implements OnInit, OnDestroy {
   ngOnInit(): void {
     if (!this.config.hasStops) return;
 
-    // Initialize stop arrival placeholders
     this.stopArrivals.set(
       this.allStops().map(stop => ({
         stop,
         arrivals: [],
+        uptown: [],
+        downtown: [],
         loading: true,
         error: null,
         lastUpdated: null,
@@ -52,37 +53,38 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.refreshTimer != null) {
-      clearInterval(this.refreshTimer);
-    }
+    if (this.refreshTimer != null) clearInterval(this.refreshTimer);
   }
 
   async refresh(): Promise<void> {
     const stops = this.allStops();
 
-    // Mark all stops as loading (keep existing arrivals)
     this.stopArrivals.update(list =>
       list.map(sa => ({ ...sa, loading: true, error: null }))
     );
 
-    // Fetch all stop arrivals first so we know which routes are active
     await Promise.allSettled(
       stops.map((stop, idx) => this.fetchStop(stop, idx))
     );
 
-    // Collect the route IDs that actually appeared in arrivals
+    // Build filter sets for alert relevance check
     const routeIds = new Set(
       this.stopArrivals().flatMap(sa => sa.arrivals.map(a => a.routeName))
     );
-    // Also include all configured stop IDs so alerts for stops with no
-    // current arrivals (e.g. suspended service) still surface
-    const stopIds = new Set(stops.map(s => s.id));
+    // For bidirectional subway stops, expand the base ID to both N and S
+    const stopIds = new Set<string>();
+    for (const stop of stops) {
+      if (stop.bothDirections) {
+        stopIds.add(stop.id + 'N');
+        stopIds.add(stop.id + 'S');
+      } else {
+        stopIds.add(stop.id);
+      }
+    }
 
-    // Now fetch alerts filtered to only those routes / stops
     this.alertsLoading.set(true);
     try {
-      const alerts = await this.mta.getAlerts(stopIds, routeIds);
-      this.alerts.set(alerts);
+      this.alerts.set(await this.mta.getAlerts(stopIds, routeIds));
     } catch {
       // leave previous alerts visible on error
     } finally {
@@ -94,24 +96,29 @@ export class App implements OnInit, OnDestroy {
 
   private async fetchStop(stop: StopConfig, idx: number): Promise<void> {
     try {
-      const arrivals =
-        stop.type === 'subway'
-          ? await this.mta.getSubwayArrivals(stop)
-          : await this.mta.getBusArrivals(stop);
-
-      this.stopArrivals.update(list =>
-        list.map((sa, i) =>
-          i === idx
-            ? { ...sa, arrivals, loading: false, error: null, lastUpdated: new Date() }
-            : sa
-        )
-      );
+      if (stop.type === 'subway') {
+        const { uptown, downtown, arrivals } = await this.mta.getSubwayArrivals(stop);
+        this.stopArrivals.update(list =>
+          list.map((sa, i) =>
+            i === idx
+              ? { ...sa, uptown, downtown, arrivals, loading: false, error: null, lastUpdated: new Date() }
+              : sa
+          )
+        );
+      } else {
+        const arrivals = await this.mta.getBusArrivals(stop);
+        this.stopArrivals.update(list =>
+          list.map((sa, i) =>
+            i === idx
+              ? { ...sa, arrivals, uptown: [], downtown: [], loading: false, error: null, lastUpdated: new Date() }
+              : sa
+          )
+        );
+      }
     } catch (err: unknown) {
       const msg = this.friendlyError(err);
       this.stopArrivals.update(list =>
-        list.map((sa, i) =>
-          i === idx ? { ...sa, loading: false, error: msg } : sa
-        )
+        list.map((sa, i) => i === idx ? { ...sa, loading: false, error: msg } : sa)
       );
     }
   }
@@ -121,9 +128,11 @@ export class App implements OnInit, OnDestroy {
       if (err.message.includes('CORS') || err.message.includes('0 Unknown')) {
         return 'Network error — check proxy setting';
       }
+      if (err.message.includes('Protobuf decode failed')) {
+        return err.message.slice(0, 120);
+      }
       return err.message.slice(0, 80);
     }
-    // Angular HttpErrorResponse
     const e = err as { status?: number; message?: string };
     if (e.status === 0) return 'Network error — check proxy setting';
     if (e.status === 403) return '403 Forbidden — check API key';

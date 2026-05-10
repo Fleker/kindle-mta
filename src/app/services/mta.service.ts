@@ -36,6 +36,7 @@ function pickEnglishText(translated: transit_realtime.ITranslatedString | null |
 }
 
 interface CacheEntry {
+  /** Raw bytes as received from the proxy (may be compressed). */
   data: Uint8Array;
   fetchedAt: number;
 }
@@ -45,17 +46,26 @@ export class MtaService {
   private http = inject(HttpClient);
   private cfg = inject(ConfigService);
 
-  // Cache binary feed data keyed by feed path
+  // Cache raw feed bytes keyed by URL; decompression happens at decode time
   private cache = new Map<string, CacheEntry>();
-  private CACHE_TTL = 30_000; // 30 s – feeds update every 15-30 s
+  private CACHE_TTL = 30_000; // 30 s
 
   // ─── Public API ───────────────────────────────────────────────────────────
 
-  /** Fetch arrivals for a subway stop. May throw on network/parse error. */
-  async getSubwayArrivals(stop: StopConfig): Promise<Arrival[]> {
+  /**
+   * Fetch subway arrivals for a stop/station.
+   * Returns `{ uptown, downtown, arrivals }` where:
+   *   - bothDirections=true  → uptown and downtown are both populated
+   *   - bothDirections=false → only the matching direction is populated;
+   *                            the other is an empty array
+   *   - arrivals             → uptown + downtown combined (for alert filtering)
+   */
+  async getSubwayArrivals(
+    stop: StopConfig,
+  ): Promise<{ uptown: Arrival[]; downtown: Arrival[]; arrivals: Arrival[] }> {
     const feedPath = feedForStopId(stop.id);
-    const data = await this.fetchBinary(`${MTA_FEED_BASE}/${feedPath}`);
-    return this.parseSubwayFeed(data, stop);
+    const raw = await this.fetchBinary(`${MTA_FEED_BASE}/${feedPath}`);
+    return this.parseSubwayFeed(raw, stop);
   }
 
   /** Fetch arrivals for a bus stop via MTA Bus Time SIRI API. */
@@ -68,21 +78,19 @@ export class MtaService {
       version: '2',
     });
     const url = `${BUS_SIRI_URL}?${params.toString()}`;
-    const proxied = this.proxy(url);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const resp = await firstValueFrom(this.http.get<any>(proxied));
+    const resp = await firstValueFrom(this.http.get<any>(this.proxy(url)));
     return this.parseBusFeed(resp, stop);
   }
 
   /**
-   * Fetch service alerts and filter to only those relevant to the provided
-   * stop IDs (from the query params) or route IDs (from fetched arrivals).
+   * Fetch service alerts filtered to the provided stop IDs and route IDs.
    * Returns an empty array on error.
    */
   async getAlerts(stopIds: Set<string>, routeIds: Set<string>): Promise<ServiceAlert[]> {
     try {
-      const data = await this.fetchBinary(`${MTA_FEED_BASE}/${ALL_ALERTS_FEED}`);
-      return this.parseAlertsFeed(data, stopIds, routeIds);
+      const raw = await this.fetchBinary(`${MTA_FEED_BASE}/${ALL_ALERTS_FEED}`);
+      return this.parseAlertsFeed(raw, stopIds, routeIds);
     } catch {
       return [];
     }
@@ -100,23 +108,111 @@ export class MtaService {
     if (cached && Date.now() - cached.fetchedAt < this.CACHE_TTL) {
       return cached.data;
     }
-    const proxied = this.proxy(url);
     const buffer = await firstValueFrom(
-      this.http.get(proxied, { responseType: 'arraybuffer' })
+      this.http.get(this.proxy(url), { responseType: 'arraybuffer' })
     );
     const data = new Uint8Array(buffer);
     this.cache.set(url, { data, fetchedAt: Date.now() });
     return data;
   }
 
+  // ─── Protobuf decode with multi-strategy decompression ────────────────────
+
+  /**
+   * Decode a GTFS-RT FeedMessage from raw bytes returned by the proxy.
+   *
+   * CORS proxies can deliver bytes in several states:
+   *   1. Raw protobuf  — browser decompressed the gzip (normal case)
+   *   2. Gzip bytes    — proxy forwarded compressed body without Content-Encoding
+   *   3. Deflate bytes — less common but possible
+   *
+   * We try each strategy in order and throw a diagnostic error if all fail.
+   */
+  private async decodeFeedMessage(bytes: Uint8Array): Promise<transit_realtime.FeedMessage> {
+    // Strategy 1: raw protobuf (the common case)
+    try {
+      return transit_realtime.FeedMessage.decode(bytes);
+    } catch { /* try decompression */ }
+
+    // Strategy 2: gzip — magic bytes 1f 8b
+    if (bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+      try {
+        const decompressed = await this.decompress(bytes, 'gzip');
+        return transit_realtime.FeedMessage.decode(decompressed);
+      } catch { /* fall through */ }
+    }
+
+    // Strategy 3: zlib/deflate — magic byte 78 (78 01, 78 9c, 78 da, 78 5e)
+    if (bytes.length >= 2 && bytes[0] === 0x78) {
+      try {
+        const decompressed = await this.decompress(bytes, 'deflate');
+        return transit_realtime.FeedMessage.decode(decompressed);
+      } catch { /* fall through */ }
+    }
+
+    // Strategy 4: raw deflate (no zlib header)
+    try {
+      const decompressed = await this.decompress(bytes, 'deflate-raw');
+      return transit_realtime.FeedMessage.decode(decompressed);
+    } catch { /* fall through */ }
+
+    // All strategies failed — include diagnostic bytes for debugging
+    const preview = Array.from(bytes.slice(0, 8))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join(' ');
+    throw new Error(
+      `Protobuf decode failed (${bytes.length} bytes, first 8: ${preview}). ` +
+      `Your proxy may be corrupting binary responses — see README for proxy setup.`
+    );
+  }
+
+  /** Decompress bytes using the browser-native DecompressionStream API. */
+  private async decompress(
+    bytes: Uint8Array,
+    format: 'gzip' | 'deflate' | 'deflate-raw',
+  ): Promise<Uint8Array> {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error(`DecompressionStream not available (needed for ${format})`);
+    }
+    const ds = new DecompressionStream(format);
+    const writer = ds.writable.getWriter();
+    // .slice() ensures a plain ArrayBuffer backing (not SharedArrayBuffer)
+    writer.write(bytes.slice());
+    writer.close();
+
+    const chunks: Uint8Array[] = [];
+    const reader = ds.readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+
+    const totalLen = chunks.reduce((n, c) => n + c.length, 0);
+    const out = new Uint8Array(totalLen);
+    let off = 0;
+    for (const chunk of chunks) { out.set(chunk, off); off += chunk.length; }
+    return out;
+  }
+
   // ─── Parsers ───────────────────────────────────────────────────────────────
 
-  private parseSubwayFeed(data: Uint8Array, stop: StopConfig): Arrival[] {
-    const feed = transit_realtime.FeedMessage.decode(data);
+  private async parseSubwayFeed(
+    data: Uint8Array,
+    stop: StopConfig,
+  ): Promise<{ uptown: Arrival[]; downtown: Arrival[]; arrivals: Arrival[] }> {
+    const feed = await this.decodeFeedMessage(data);
     const nowSec = Date.now() / 1000;
-    const results: Arrival[] = [];
-    const dir = stop.id.slice(-1).toUpperCase();
-    const destination = dir === 'N' ? 'Uptown' : dir === 'S' ? 'Downtown' : '';
+    const max = this.cfg.config.maxArrivals;
+
+    // Determine which stop IDs to collect
+    const uptownId  = stop.bothDirections ? stop.id + 'N'
+                    : stop.id.endsWith('N') ? stop.id : null;
+    const downtownId = stop.bothDirections ? stop.id + 'S'
+                     : stop.id.endsWith('S') ? stop.id : null;
+
+    const uptownRaw: Arrival[] = [];
+    const downtownRaw: Arrival[] = [];
 
     for (const entity of feed.entity) {
       const tu = entity.tripUpdate;
@@ -124,29 +220,34 @@ export class MtaService {
       const routeId = tu.trip?.routeId ?? '?';
 
       for (const stu of tu.stopTimeUpdate ?? []) {
-        if (stu.stopId !== stop.id) continue;
+        const sid = stu.stopId;
+        if (sid !== uptownId && sid !== downtownId) continue;
         const arrSec = toLong(stu.arrival?.time) ?? toLong(stu.departure?.time);
         if (arrSec == null || arrSec < nowSec) continue;
 
-        results.push({
+        const arrival: Arrival = {
           routeName: routeId,
-          destination,
+          destination: sid === uptownId ? 'Uptown' : 'Downtown',
           arrivalTime: new Date(arrSec * 1000),
           minutesAway: Math.round((arrSec - nowSec) / 60),
-        });
+        };
+        if (sid === uptownId) uptownRaw.push(arrival);
+        else downtownRaw.push(arrival);
       }
     }
 
-    // Sort by time, dedupe by route+time, limit to maxArrivals per route
-    results.sort((a, b) => a.arrivalTime.getTime() - b.arrivalTime.getTime());
-    return this.limitPerRoute(results, this.cfg.config.maxArrivals);
+    uptownRaw.sort((a, b) => a.arrivalTime.getTime() - b.arrivalTime.getTime());
+    downtownRaw.sort((a, b) => a.arrivalTime.getTime() - b.arrivalTime.getTime());
+
+    const uptown   = this.limitPerRoute(uptownRaw, max);
+    const downtown = this.limitPerRoute(downtownRaw, max);
+    return { uptown, downtown, arrivals: [...uptown, ...downtown] };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private parseBusFeed(resp: any, stop: StopConfig): Arrival[] {
     const nowSec = Date.now() / 1000;
-    const deliveries =
-      resp?.Siri?.ServiceDelivery?.StopMonitoringDelivery ?? [];
+    const deliveries = resp?.Siri?.ServiceDelivery?.StopMonitoringDelivery ?? [];
     const results: Arrival[] = [];
 
     for (const delivery of deliveries) {
@@ -176,12 +277,12 @@ export class MtaService {
     return results.slice(0, this.cfg.config.maxArrivals);
   }
 
-  private parseAlertsFeed(
+  private async parseAlertsFeed(
     data: Uint8Array,
     stopIds: Set<string>,
     routeIds: Set<string>,
-  ): ServiceAlert[] {
-    const feed = transit_realtime.FeedMessage.decode(data);
+  ): Promise<ServiceAlert[]> {
+    const feed = await this.decodeFeedMessage(data);
     const now = Date.now() / 1000;
     const alerts: ServiceAlert[] = [];
 
@@ -189,7 +290,6 @@ export class MtaService {
       const alert = entity.alert;
       if (!alert) continue;
 
-      // Check if alert is currently active
       const periods = alert.activePeriod ?? [];
       if (periods.length > 0) {
         const isActive = periods.some(p => {
@@ -200,7 +300,6 @@ export class MtaService {
         if (!isActive) continue;
       }
 
-      // Collect affected routes and check relevance in one pass
       const affectedRoutes: string[] = [];
       let relevant = false;
       for (const ie of alert.informedEntity ?? []) {

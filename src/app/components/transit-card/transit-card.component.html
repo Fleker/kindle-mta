@@ -1,4 +1,5 @@
 <div class="card">
+  <!-- ── Header ── -->
   <div class="card-header">
     <span class="stop-label">{{ stopArrivals().stop.label }}</span>
     @if (stopArrivals().stop.walkMinutes > 0) {
@@ -6,43 +7,86 @@
     }
   </div>
 
+  <!-- ── Body ── -->
   @if (stopArrivals().loading && !stopArrivals().lastUpdated) {
-    <div class="card-body loading">Loading...</div>
+    <div class="card-body state-row">Loading...</div>
+
   } @else if (stopArrivals().error) {
-    <div class="card-body error">
+    <div class="card-body state-row error">
       <span class="error-icon">!</span> {{ stopArrivals().error }}
     </div>
-  } @else if (stopArrivals().arrivals.length === 0) {
-    <div class="card-body empty">No upcoming arrivals</div>
-  } @else {
-    <div class="card-body">
-      @for (route of routes(); track route) {
-        <div class="route-row">
-          <span class="route-badge">{{ route }}</span>
-          <span class="arrivals-list">
-            @for (arrival of routeGroups().get(route) ?? []; track arrival.arrivalTime.getTime()) {
-              <span
-                class="arrival-chip"
-                [class.leave-now]="shouldLeaveNow(arrival)"
-              >
-                {{ formatArrival(arrival) }}
+
+  } @else if (stopArrivals().stop.bothDirections) {
+    <!-- Two-column bidirectional subway layout -->
+    @if (stopArrivals().uptown.length === 0 && stopArrivals().downtown.length === 0) {
+      <div class="card-body state-row">No upcoming arrivals</div>
+    } @else {
+      <div class="bidir">
+        <div class="bidir-head uptown-head">↑ Uptown</div>
+        <div class="bidir-head downtown-head">↓ Downtown</div>
+
+        @for (route of allRoutes(); track route) {
+          <div class="bidir-cell">
+            <div class="route-row">
+              <span class="route-badge">{{ route }}</span>
+              <span class="arrivals-list">
+                @for (arr of uptownGroups().get(route) ?? []; track arr.arrivalTime.getTime()) {
+                  <span class="arrival-chip" [class.leave-now]="shouldLeaveNow(arr)">
+                    {{ formatArrival(arr) }}
+                  </span>
+                }
+                @if ((uptownGroups().get(route) ?? []).length === 0) {
+                  <span class="no-service">—</span>
+                }
               </span>
-            }
-          </span>
-          @if (firstArrival(route); as first) {
-            <span class="destination">{{ first.destination }}</span>
-          }
-        </div>
-      }
-    </div>
+            </div>
+          </div>
+          <div class="bidir-cell">
+            <div class="route-row">
+              <span class="route-badge">{{ route }}</span>
+              <span class="arrivals-list">
+                @for (arr of downtownGroups().get(route) ?? []; track arr.arrivalTime.getTime()) {
+                  <span class="arrival-chip" [class.leave-now]="shouldLeaveNow(arr)">
+                    {{ formatArrival(arr) }}
+                  </span>
+                }
+                @if ((downtownGroups().get(route) ?? []).length === 0) {
+                  <span class="no-service">—</span>
+                }
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+  } @else {
+    <!-- Single-direction / bus layout -->
+    @if (stopArrivals().arrivals.length === 0) {
+      <div class="card-body state-row">No upcoming arrivals</div>
+    } @else {
+      <div class="card-body">
+        @for (route of routes(); track route) {
+          <div class="route-row">
+            <span class="route-badge">{{ route }}</span>
+            <span class="arrivals-list">
+              @for (arr of routeGroups().get(route) ?? []; track arr.arrivalTime.getTime()) {
+                <span class="arrival-chip" [class.leave-now]="shouldLeaveNow(arr)">
+                  {{ formatArrival(arr) }}
+                </span>
+              }
+            </span>
+          </div>
+        }
+      </div>
+    }
   }
 
+  <!-- ── Footer ── -->
   @if (stopArrivals().lastUpdated) {
     <div class="card-footer">
       Updated {{ formatTime(stopArrivals().lastUpdated) }}
-      @if (stopArrivals().loading) {
-        <span class="refreshing"> · refreshing...</span>
-      }
+      @if (stopArrivals().loading) {<span class="refreshing"> · refreshing...</span>}
     </div>
   }
 </div>

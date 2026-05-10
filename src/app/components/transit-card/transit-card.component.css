@@ -4,6 +4,7 @@
   background: #fff;
 }
 
+/* ── Header ───────────────────────────────────────────────────── */
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -26,27 +27,19 @@
   opacity: 0.85;
 }
 
-.card-body {
-  padding: 6px 10px;
-}
-
-.card-body.loading,
-.card-body.empty {
-  color: #555;
-  font-style: italic;
+/* ── State rows (loading / error / empty) ─────────────────────── */
+.state-row {
   padding: 8px 10px;
+  font-style: italic;
+  color: #555;
 }
 
-.card-body.error {
+.state-row.error {
   color: #000;
   font-weight: bold;
-  padding: 8px 10px;
+  font-style: normal;
   background: repeating-linear-gradient(
-    45deg,
-    #fff,
-    #fff 4px,
-    #eee 4px,
-    #eee 8px
+    45deg, #fff, #fff 4px, #eee 4px, #eee 8px
   );
 }
 
@@ -62,16 +55,53 @@
   margin-right: 4px;
 }
 
-.route-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+/* ── Single-direction / bus card body ────────────────────────── */
+.card-body {
+  padding: 4px 10px;
+}
+
+/* ── Two-column bidirectional grid ───────────────────────────── */
+.bidir {
+  display: grid;
+  /* Two equal columns divided by a 1px center border */
+  grid-template-columns: 1fr 1fr;
+}
+
+.bidir-head {
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  background: #e8e8e8;
+  border-bottom: 1px solid #000;
+}
+
+.bidir-head.uptown-head {
+  border-right: 1px solid #000;
+}
+
+.bidir-cell {
+  padding: 2px 6px;
   border-bottom: 1px solid #ddd;
 }
 
-.route-row:last-child {
+/* Right column cells get a left border (the vertical divider) */
+.bidir-cell:nth-child(even) {
+  border-left: 1px solid #aaa;
+}
+
+/* Remove bottom border on the last pair of cells */
+.bidir-cell:nth-last-child(-n+2) {
   border-bottom: none;
+}
+
+/* ── Shared route row ─────────────────────────────────────────── */
+.route-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0;
 }
 
 .route-badge {
@@ -81,7 +111,7 @@
   line-height: 1.8em;
   text-align: center;
   font-weight: bold;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   border: 2px solid #000;
   border-radius: 50%;
   flex-shrink: 0;
@@ -90,31 +120,31 @@
 .arrivals-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
   flex: 1;
 }
 
 .arrival-chip {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: bold;
   padding: 1px 4px;
-  border: 1px solid transparent;
+  border: 3.5px solid #888;
 }
 
 .arrival-chip.leave-now {
-  border: 2px solid #000;
+  border-color: #000;
+  /* border-width: 3px; */
+  font-weight: 100;
   background: #000;
   color: #fff;
-  padding: 1px 4px;
 }
 
-.destination {
-  font-size: 0.8rem;
-  color: #555;
-  white-space: nowrap;
-  flex-shrink: 0;
+.no-service {
+  color: #aaa;
+  font-size: 0.9rem;
 }
 
+/* ── Footer ───────────────────────────────────────────────────── */
 .card-footer {
   padding: 3px 10px;
   font-size: 0.72rem;
@@ -123,6 +153,4 @@
   background: #f7f7f7;
 }
 
-.refreshing {
-  font-style: italic;
-}
+.refreshing { font-style: italic; }

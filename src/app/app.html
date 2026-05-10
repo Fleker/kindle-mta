@@ -11,10 +11,7 @@
 
     <main class="board-stops">
       @for (sa of stopArrivals(); track sa.stop.id) {
-        <app-transit-card
-          [stopArrivals]="sa"
-          [walkMinutes]="sa.stop.walkMinutes"
-        />
+        <app-transit-card [stopArrivals]="sa" />
       }
     </main>
 
