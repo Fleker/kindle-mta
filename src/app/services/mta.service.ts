@@ -311,6 +311,8 @@ export class MtaService {
         }
       }
       if (!relevant) continue;
+      if (alert.informedEntity?.some(x => x.agencyId !== 'MTASBWY')) continue;
+      console.log(alert)
 
       alerts.push({
         id: entity.id,
