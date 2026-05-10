@@ -8,7 +8,6 @@ import { ConfigService } from './config.service';
 const MTA_FEED_BASE = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds';
 const BUS_SIRI_URL = 'https://bustime.mta.info/api/siri/stop-monitoring.json';
 const ALL_ALERTS_FEED = 'camsys%2Fall-alerts';
-const SUBWAY_ALERTS_FEED = 'camsys%2Fsubway-alerts';
 
 /** Map first character of a GTFS stop ID to the corresponding GTFS-RT feed path. */
 function feedForStopId(stopId: string): string {
@@ -177,7 +176,11 @@ export class MtaService {
     return results.slice(0, this.cfg.config.maxArrivals);
   }
 
-  private parseAlertsFeed(data: Uint8Array): ServiceAlert[] {
+  private parseAlertsFeed(
+    data: Uint8Array,
+    stopIds: Set<string>,
+    routeIds: Set<string>,
+  ): ServiceAlert[] {
     const feed = transit_realtime.FeedMessage.decode(data);
     const now = Date.now() / 1000;
     const alerts: ServiceAlert[] = [];
@@ -197,16 +200,23 @@ export class MtaService {
         if (!isActive) continue;
       }
 
-      const routes: string[] = [];
+      // Collect affected routes and check relevance in one pass
+      const affectedRoutes: string[] = [];
+      let relevant = false;
       for (const ie of alert.informedEntity ?? []) {
-        if (ie.routeId) routes.push(ie.routeId);
+        if (ie.routeId) affectedRoutes.push(ie.routeId);
+        if (!relevant) {
+          if (ie.stopId && stopIds.has(ie.stopId)) relevant = true;
+          if (ie.routeId && routeIds.has(ie.routeId)) relevant = true;
+        }
       }
+      if (!relevant) continue;
 
       alerts.push({
         id: entity.id,
         header: pickEnglishText(alert.headerText),
         description: pickEnglishText(alert.descriptionText),
-        affectedRoutes: [...new Set(routes)],
+        affectedRoutes: [...new Set(affectedRoutes)],
       });
     }
 

@@ -65,27 +65,30 @@ export class App implements OnInit, OnDestroy {
       list.map(sa => ({ ...sa, loading: true, error: null }))
     );
 
-    // Fetch arrivals for each stop concurrently
-    const fetchPromises = stops.map((stop, idx) =>
-      this.fetchStop(stop, idx)
+    // Fetch all stop arrivals first so we know which routes are active
+    await Promise.allSettled(
+      stops.map((stop, idx) => this.fetchStop(stop, idx))
     );
 
-    // Fetch alerts concurrently
-    this.alertsLoading.set(true);
-    const alertsPromise = this.mta
-      .getAlerts(
-        this.config.config.subwayStops.length > 0,
-        this.config.config.busStops.length > 0
-      )
-      .then(a => {
-        this.alerts.set(a);
-        this.alertsLoading.set(false);
-      })
-      .catch(() => {
-        this.alertsLoading.set(false);
-      });
+    // Collect the route IDs that actually appeared in arrivals
+    const routeIds = new Set(
+      this.stopArrivals().flatMap(sa => sa.arrivals.map(a => a.routeName))
+    );
+    // Also include all configured stop IDs so alerts for stops with no
+    // current arrivals (e.g. suspended service) still surface
+    const stopIds = new Set(stops.map(s => s.id));
 
-    await Promise.allSettled([...fetchPromises, alertsPromise]);
+    // Now fetch alerts filtered to only those routes / stops
+    this.alertsLoading.set(true);
+    try {
+      const alerts = await this.mta.getAlerts(stopIds, routeIds);
+      this.alerts.set(alerts);
+    } catch {
+      // leave previous alerts visible on error
+    } finally {
+      this.alertsLoading.set(false);
+    }
+
     this.lastRefresh.set(new Date());
   }
 
