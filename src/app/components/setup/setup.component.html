@@ -12,8 +12,8 @@
       <tbody>
         <tr>
           <td><code>subway</code></td>
-          <td>Subway GTFS stop IDs (comma-separated)</td>
-          <td><code>R16N,R16S</code></td>
+          <td>Subway GTFS station IDs, comma-separated. Omit the N/S suffix to show both directions in one card.</td>
+          <td><code>R16,123</code></td>
         </tr>
         <tr>
           <td><code>bus</code></td>
@@ -23,12 +23,12 @@
         <tr>
           <td><code>walk</code></td>
           <td>Walk time in minutes per stop</td>
-          <td><code>R16N:5,308984:8</code></td>
+          <td><code>R16:5,308984:8</code></td>
         </tr>
         <tr>
           <td><code>labels</code></td>
-          <td>Custom display name per stop</td>
-          <td><code>R16N:Times Sq NB</code></td>
+          <td>Custom display name per stop (works for both subway and bus)</td>
+          <td><code>R16:Times Sq,308984:34th St</code></td>
         </tr>
         <tr>
           <td><code>n</code></td>
@@ -63,7 +63,8 @@
     <h2>Finding Stop IDs</h2>
     <ul>
       <li><strong>Subway:</strong> Download the MTA GTFS static data from mta.info/developers.
-        Open <code>stops.txt</code> and look up your station. The stop ID ends in <code>N</code> (uptown) or <code>S</code> (downtown).</li>
+        Open <code>stops.txt</code> and look up your station. Use the parent station ID (e.g. <code>R16</code>) to show both directions in one card,
+        or append <code>N</code>/<code>S</code> (e.g. <code>R16N</code>) for a single direction.</li>
       <li><strong>Bus:</strong> Find your stop on the MTA Bus Time map at bustime.mta.info.
         The numeric stop ID appears in the URL or popup.</li>
     </ul>

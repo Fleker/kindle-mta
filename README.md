@@ -21,10 +21,10 @@ Open the app and configure your stops via URL query parameters.
 
 | Param | Description | Example |
 |-------|-------------|---------|
-| `subway` | Comma-separated GTFS subway stop IDs | `R16N,R16S,101N` |
+| `subway` | Comma-separated GTFS subway station IDs. Omit the N/S suffix to show both directions in one card (recommended). Append `N` or `S` for a single direction. | `R16,101` |
 | `bus` | Comma-separated MTA bus stop IDs | `308984,301446` |
-| `walk` | Walk time in minutes per stop (`id:minutes`) | `R16N:5,308984:8` |
-| `labels` | Custom display label per stop (`id:label`) | `R16N:Times Sq NB` |
+| `walk` | Walk time in minutes per stop (`id:minutes`) | `R16:5,308984:8` |
+| `labels` | Custom display label per stop (`id:label`). Works for both subway and bus stops. | `R16:Times Sq,308984:34th St` |
 | `n` | Max arrivals per route (default: `4`) | `4` |
 | `busKey` | MTA Bus Time API key | `abc123...` |
 | `proxy` | CORS proxy URL prefix (required — see below) | `https://corsproxy.io/?url=` |
@@ -33,23 +33,13 @@ Open the app and configure your stops via URL query parameters.
 ### Example URL
 
 ```
-https://your-username.github.io/kindle-mta/?subway=R16N,R16S&bus=308984&walk=R16N:5,R16S:5,308984:8&labels=R16N:Times+Sq+NB,R16S:Times+Sq+SB&n=4&busKey=YOUR_BUS_KEY&proxy=https://corsproxy.io/?url=
-```
-
-ie.
-
-```
-http://localhost:4201/kindle-mta/?subway=R16N,R16S&bus=308984&walk=R16N:5,R16S:5,308984:8&labels=R16N:Times+Sq+NB,R16S:Times+Sq+SB&n=4&busKey=YOUR_BUS_KEY&proxy=https://corsproxy.io/?url=
-```
-
-```
-http://localhost:4201/?subway=123N,123S&labels=123N:72nd+St,123S:72nd+St,405327:72nd+Crosstown&walk=123N:5,123S:5,405327:5&bus=405237
+https://your-username.github.io/kindle-mta/?subway=R16,101&bus=308984&walk=R16:5,308984:8&labels=R16:Times+Sq,308984:34th+St&n=4&busKey=YOUR_BUS_KEY&proxy=https://corsproxy.io/?url=
 ```
 
 ## Finding Stop IDs
 
 **Subway stop IDs:**
-Download the MTA GTFS static package from https://new.mta.info/developers. Open `stops.txt` inside the zip. Stop IDs end in `N` (northbound/uptown) or `S` (southbound/downtown), e.g. `R16N` = Times Square 42 St northbound (N/Q/R/W).
+Download the MTA GTFS static package from https://new.mta.info/developers. Open `stops.txt` inside the zip. Use the parent station ID (e.g. `R16`) to show both uptown and downtown in one two-column card. Append `N` or `S` (e.g. `R16N`) to show only one direction.
 
 **Bus stop IDs:**
 Visit https://bustime.mta.info and click on your stop on the map. The numeric stop code appears in the popup or URL.
