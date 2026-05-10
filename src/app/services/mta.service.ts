@@ -74,7 +74,7 @@ export class MtaService {
     const params = new URLSearchParams({
       key: busApiKey,
       MonitoringRef: stop.id,
-      MaximumStopVisits: String(maxArrivals),
+      MaximumStopVisits: String(maxArrivals + 4),
       version: '2',
     });
     const url = `${BUS_SIRI_URL}?${params.toString()}`;
@@ -273,8 +273,9 @@ export class MtaService {
       }
     }
 
+    const routesInResults = new Set(results.map(r => r.routeName));   
     results.sort((a, b) => a.arrivalTime.getTime() - b.arrivalTime.getTime());
-    return results.slice(0, this.cfg.config.maxArrivals);
+    return results.slice(0, this.cfg.config.maxArrivals * routesInResults.size);
   }
 
   private async parseAlertsFeed(
