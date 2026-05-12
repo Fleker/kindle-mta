@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>MTA Board</title>
+<style>
+*,*:before,*:after{-webkit-box-sizing:border-box;box-sizing:border-box}
+html{font-size:17px;-webkit-text-size-adjust:100%}
+body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;line-height:1.4;overflow-x:hidden}
+a{color:#000}
+
+/* Board layout */
+.board{max-width:620px;margin:0 auto;padding:8px}
+.board-header{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:baseline;-webkit-align-items:baseline;align-items:baseline;-webkit-box-pack:justify;-webkit-justify-content:space-between;justify-content:space-between;border-bottom:3px solid #000;padding-bottom:4px;margin-bottom:10px}
+.board-title{font-size:1.2rem;font-weight:bold;margin:0;letter-spacing:.04em;text-transform:uppercase}
+.board-updated{font-size:.78rem;color:#555}
+.board-stops{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-orient:vertical;-webkit-flex-direction:column;flex-direction:column}
+.board-footer{margin-top:4px}
+
+/* Transit card */
+.card{border:2px solid #000;margin-bottom:12px;background:#fff}
+.card-header{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-pack:justify;-webkit-justify-content:space-between;justify-content:space-between;-webkit-box-align:baseline;-webkit-align-items:baseline;align-items:baseline;padding:6px 10px;border-bottom:2px solid #000;background:#000;color:#fff}
+.stop-label{font-size:1rem;font-weight:bold;letter-spacing:.02em}
+.walk-time{font-size:.8rem;font-weight:normal;opacity:.85}
+.state-row{padding:8px 10px;font-style:italic;color:#555}
+.state-row.error{color:#000;font-weight:bold;font-style:normal;background:repeating-linear-gradient(45deg,#fff,#fff 4px,#eee 4px,#eee 8px)}
+.error-icon{display:inline-block;width:1.1em;height:1.1em;line-height:1.1em;text-align:center;border:2px solid #000;border-radius:50%;font-weight:bold;margin-right:4px}
+.card-body{padding:4px 10px}
+
+/* Two-column bidirectional */
+.bidir{width:100%}
+.bidir-row{width:100%;display:-webkit-box;display:-webkit-flex;display:flex}
+.bidir-head{font-size:.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;padding:4px 8px;background:#e8e8e8;border-bottom:1px solid #000;-webkit-box-flex:1;-webkit-flex:1;flex:1}
+.bidir-head.uptown-head{border-right:1px solid #000}
+.bidir-cell{padding:2px 6px;border-bottom:1px solid #ddd;-webkit-box-flex:1;-webkit-flex:1;flex:1}
+.bidir-cell.right-cell{border-left:1px solid #aaa}
+.bidir-cell.last-pair{border-bottom:none}
+
+/* Route rows */
+.route-row{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:5px;padding:3px 0}
+.route-badge{display:inline-block;width:1.8em;height:1.8em;line-height:1.8em;text-align:center;font-weight:bold;font-size:.85rem;border:2px solid #000;border-radius:50%;-webkit-flex-shrink:0;flex-shrink:0}
+.arrivals-list{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:3px;-webkit-box-flex:1;-webkit-flex:1;flex:1}
+.arrival-chip{font-size:.9rem;font-weight:bold;padding:1px 4px;border:3.5px solid #888}
+.arrival-chip.leave-now{border-color:#000;font-weight:100;background:#000;color:#fff}
+.no-service{color:#aaa;font-size:.9rem}
+.card-footer{padding:3px 10px;font-size:.72rem;color:#666;border-top:1px solid #ccc;background:#f7f7f7}
+.refreshing{font-style:italic}
+
+/* Alerts */
+.alerts-section{border-top:3px solid #000;padding-top:10px;margin-top:4px}
+.alerts-heading{font-size:.85rem;font-weight:bold;letter-spacing:.1em;text-transform:uppercase;margin:0 0 8px 0;color:#000}
+.alerts-loading,.no-alerts{font-size:.8rem;color:#666;font-style:italic;margin:0}
+.alert-item{border:1px solid #aaa;padding:6px 8px;margin-bottom:6px;background:#f9f9f9}
+.alert-routes{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;gap:4px;margin-bottom:4px}
+.alert-header{font-size:.85rem;font-weight:bold;margin:0 0 3px 0;line-height:1.3}
+.alert-desc{font-size:.78rem;color:#333;margin:0;line-height:1.35}
+
+/* Setup */
+.setup{max-width:600px;margin:0 auto;padding:16px}
+.setup-title{font-size:1.5rem;font-weight:bold;margin:0 0 4px 0;border-bottom:3px solid #000;padding-bottom:6px}
+.setup-subtitle{font-size:.9rem;color:#444;margin:6px 0 16px 0}
+.setup-section{margin-bottom:18px}
+.setup-section h2{font-size:1rem;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px 0;border-bottom:1px solid #000;padding-bottom:2px}
+.setup-section p,.setup-section ul{font-size:.85rem;line-height:1.5;margin:4px 0}
+.setup-section ul{padding-left:18px}
+.setup-section li{margin-bottom:4px}
+.param-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.param-table th{background:#000;color:#fff;padding:4px 6px;text-align:left;font-weight:bold}
+.param-table td{padding:4px 6px;border:1px solid #aaa;vertical-align:top}
+.param-table tr:nth-child(even) td{background:#f5f5f5}
+code{font-family:"Courier New",Courier,monospace;font-size:.85em;background:#eee;padding:1px 3px;border:1px solid #ccc}
+.example-url{font-family:"Courier New",Courier,monospace;font-size:.72rem;word-break:break-all;background:#f0f0f0;border:1px solid #aaa;padding:6px 8px;line-height:1.4}
+#root{min-height:100px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// ============================================================
+// MINIMAL PROTOBUF DECODER
+// Handles only the wire types and fields used by GTFS-RT.
+// ============================================================
+var Proto = (function() {
+  function readVarint(buf, pos) {
+    var result = 0, shift = 0, b;
+    do {
+      if (pos >= buf.length) throw new Error("Unexpected EOF in varint");
+      b = buf[pos++];
+      result = result + ((b & 0x7F) * Math.pow(2, shift));
+      shift += 7;
+    } while (b & 0x80);
+    return { value: result, pos: pos };
+  }
+
+  function readTag(buf, pos) {
+    var r = readVarint(buf, pos);
+    return { field: Math.floor(r.value / 8), wireType: r.value & 7, pos: r.pos };
+  }
+
+  function readLenDelim(buf, pos) {
+    var r = readVarint(buf, pos);
+    var len = r.value;
+    pos = r.pos;
+    var data = buf.slice(pos, pos + len);
+    return { data: data, pos: pos + len };
+  }
+
+  function readFixed64(buf, pos) {
+    // Read 8 bytes as a number (we only need seconds timestamps, fits in 53-bit float)
+    var lo = 0, hi = 0;
+    for (var i = 0; i < 4; i++) lo += buf[pos + i] * Math.pow(2, i * 8);
+    for (var i = 0; i < 4; i++) hi += buf[pos + 4 + i] * Math.pow(2, i * 8);
+    return { value: hi * 4294967296 + lo, pos: pos + 8 };
+  }
+
+  function readFixed32(buf, pos) {
+    var v = 0;
+    for (var i = 0; i < 4; i++) v += buf[pos + i] * Math.pow(2, i * 8);
+    return { value: v, pos: pos + 4 };
+  }
+
+  function bytesToString(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) {
+      var b = bytes[i];
+      if (b < 0x80) {
+        s += String.fromCharCode(b);
+      } else if ((b & 0xE0) === 0xC0) {
+        var b2 = bytes[++i];
+        s += String.fromCharCode(((b & 0x1F) << 6) | (b2 & 0x3F));
+      } else if ((b & 0xF0) === 0xE0) {
+        var b2 = bytes[++i], b3 = bytes[++i];
+        s += String.fromCharCode(((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F));
+      } else {
+        // 4-byte UTF-8 (emoji etc) - skip for our purposes
+        i += 3;
+      }
+    }
+    return s;
+  }
+
+  // Skip a field we don't care about
+  function skipField(buf, pos, wireType) {
+    if (wireType === 0) { // varint
+      var r = readVarint(buf, pos); return r.pos;
+    } else if (wireType === 1) { // 64-bit
+      return pos + 8;
+    } else if (wireType === 2) { // len-delim
+      var r = readVarint(buf, pos); return r.pos + r.value;
+    } else if (wireType === 5) { // 32-bit
+      return pos + 4;
+    }
+    throw new Error("Unknown wire type: " + wireType);
+  }
+
+  // ── GTFS-RT parsers ───────────────────────────────────────
+  // We parse only what we need:
+  //   FeedMessage { entity: repeated FeedEntity }
+  //   FeedEntity { id, trip_update, alert }
+  //   TripUpdate { trip: TripDescriptor, stop_time_update: repeated StopTimeUpdate }
+  //   TripDescriptor { route_id }
+  //   StopTimeUpdate { stop_id, arrival: StopTimeEvent, departure: StopTimeEvent }
+  //   StopTimeEvent { time (int64) }
+  //   Alert { informed_entity, active_period, header_text, description_text }
+  //   EntitySelector { stop_id, route_id, agency_id }
+  //   TimeRange { start, end }
+  //   TranslatedString { translation: repeated Translation }
+  //   Translation { text, language }
+
+  function parseTimeEvent(buf) {
+    // Fields: delay=1 (int32), time=2 (int64 as varint), uncertainty=3
+    var pos = 0, time = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 2 && t.wireType === 0) { // time: int64 stored as varint
+        var r = readVarint(buf, pos); time = r.value; pos = r.pos;
+      } else {
+        pos = skipField(buf, pos, t.wireType);
+      }
+    }
+    return time;
+  }
+
+  function parseStopTimeUpdate(buf) {
+    // Fields: stop_sequence=1, arrival=2, departure=3, stop_id=4, schedule_relationship=5
+    var pos = 0, stopId = null, arrival = null, departure = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 2) { // arrival (StopTimeEvent)
+        var r = readLenDelim(buf, pos); arrival = parseTimeEvent(r.data); pos = r.pos;
+      } else if (t.field === 3) { // departure (StopTimeEvent)
+        var r = readLenDelim(buf, pos); departure = parseTimeEvent(r.data); pos = r.pos;
+      } else if (t.field === 4) { // stop_id (string)
+        var r = readLenDelim(buf, pos); stopId = bytesToString(r.data); pos = r.pos;
+      } else {
+        pos = skipField(buf, pos, t.wireType);
+      }
+    }
+    return { stopId: stopId, arrival: arrival, departure: departure };
+  }
+
+  function parseTripDescriptor(buf) {
+    var pos = 0, routeId = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 5) { // route_id
+        var r = readLenDelim(buf, pos); routeId = bytesToString(r.data); pos = r.pos;
+      } else {
+        pos = skipField(buf, pos, t.wireType);
+      }
+    }
+    return { routeId: routeId };
+  }
+
+  function parseTripUpdate(buf) {
+    var pos = 0, trip = null, stopTimeUpdates = [];
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { // trip: TripDescriptor
+        var r = readLenDelim(buf, pos); trip = parseTripDescriptor(r.data); pos = r.pos;
+      } else if (t.field === 2) { // stop_time_update
+        var r = readLenDelim(buf, pos); stopTimeUpdates.push(parseStopTimeUpdate(r.data)); pos = r.pos;
+      } else {
+        pos = skipField(buf, pos, t.wireType);
+      }
+    }
+    return { trip: trip, stopTimeUpdates: stopTimeUpdates };
+  }
+
+  function parseTranslation(buf) {
+    var pos = 0, text = null, language = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { var r = readLenDelim(buf, pos); text = bytesToString(r.data); pos = r.pos; }
+      else if (t.field === 2) { var r = readLenDelim(buf, pos); language = bytesToString(r.data); pos = r.pos; }
+      else { pos = skipField(buf, pos, t.wireType); }
+    }
+    return { text: text, language: language };
+  }
+
+  function parseTranslatedString(buf) {
+    var pos = 0, translations = [];
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { var r = readLenDelim(buf, pos); translations.push(parseTranslation(r.data)); pos = r.pos; }
+      else { pos = skipField(buf, pos, t.wireType); }
+    }
+    return translations;
+  }
+
+  function pickEnglish(translations) {
+    if (!translations || !translations.length) return '';
+    for (var i = 0; i < translations.length; i++) {
+      if (translations[i].language === 'en' || translations[i].language === 'en-US') return translations[i].text || '';
+    }
+    return translations[0].text || '';
+  }
+
+  function parseEntitySelector(buf) {
+    // Fields: agencyId=1, routeId=2, routeType=3, trip=4(message), stopId=5, directionId=6
+    var pos = 0, stopId = null, routeId = null, agencyId = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { var r = readLenDelim(buf, pos); agencyId = bytesToString(r.data); pos = r.pos; }
+      else if (t.field === 2) { var r = readLenDelim(buf, pos); routeId = bytesToString(r.data); pos = r.pos; }
+      else if (t.field === 5) { var r = readLenDelim(buf, pos); stopId = bytesToString(r.data); pos = r.pos; }
+      else { pos = skipField(buf, pos, t.wireType); }
+    }
+    return { agencyId: agencyId, routeId: routeId, stopId: stopId };
+  }
+
+  function parseTimeRange(buf) {
+    var pos = 0, start = null, end = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { var r = readVarint(buf, pos); start = r.value; pos = r.pos; }
+      else if (t.field === 2) { var r = readVarint(buf, pos); end = r.value; pos = r.pos; }
+      else { pos = skipField(buf, pos, t.wireType); }
+    }
+    return { start: start, end: end };
+  }
+
+  function parseAlert(buf) {
+    var pos = 0, informedEntities = [], activePeriods = [], headerText = null, descriptionText = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { var r = readLenDelim(buf, pos); activePeriods.push(parseTimeRange(r.data)); pos = r.pos; }
+      else if (t.field === 5) { var r = readLenDelim(buf, pos); informedEntities.push(parseEntitySelector(r.data)); pos = r.pos; }
+      else if (t.field === 10) { var r = readLenDelim(buf, pos); headerText = parseTranslatedString(r.data); pos = r.pos; }
+      else if (t.field === 11) { var r = readLenDelim(buf, pos); descriptionText = parseTranslatedString(r.data); pos = r.pos; }
+      else { pos = skipField(buf, pos, t.wireType); }
+    }
+    return {
+      informedEntities: informedEntities,
+      activePeriods: activePeriods,
+      header: pickEnglish(headerText),
+      description: pickEnglish(descriptionText)
+    };
+  }
+
+  function parseFeedEntity(buf) {
+    var pos = 0, id = null, tripUpdate = null, alert = null;
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 1) { var r = readLenDelim(buf, pos); id = bytesToString(r.data); pos = r.pos; }
+      else if (t.field === 3) { var r = readLenDelim(buf, pos); tripUpdate = parseTripUpdate(r.data); pos = r.pos; }
+      else if (t.field === 5) { var r = readLenDelim(buf, pos); alert = parseAlert(r.data); pos = r.pos; }
+      else { pos = skipField(buf, pos, t.wireType); }
+    }
+    return { id: id, tripUpdate: tripUpdate, alert: alert };
+  }
+
+  function parseFeedMessage(buf) {
+    var pos = 0, entities = [];
+    while (pos < buf.length) {
+      var t = readTag(buf, pos); pos = t.pos;
+      if (t.field === 2) { // entity
+        var r = readLenDelim(buf, pos); entities.push(parseFeedEntity(r.data)); pos = r.pos;
+      } else {
+        pos = skipField(buf, pos, t.wireType);
+      }
+    }
+    return { entities: entities };
+  }
+
+  return { parseFeedMessage: parseFeedMessage, bytesToString: bytesToString };
+})();
+
+// ============================================================
+// CONFIG PARSER
+// ============================================================
+var Config = (function() {
+  function parseKV(raw) {
+    var map = {};
+    if (!raw) return map;
+    var parts = raw.split(',');
+    for (var i = 0; i < parts.length; i++) {
+      var colon = parts[i].indexOf(':');
+      if (colon < 0) continue;
+      var k = parts[i].slice(0, colon).replace(/^\s+|\s+$/g, '');
+      var v = parts[i].slice(colon + 1).replace(/^\s+|\s+$/g, '');
+      if (k) map[k] = v;
+    }
+    return map;
+  }
+
+  function getParam(search, name) {
+    // Manual URLSearchParams for Safari 5
+    var pairs = search.replace(/^\?/, '').split('&');
+    for (var i = 0; i < pairs.length; i++) {
+      var eq = pairs[i].indexOf('=');
+      if (eq < 0) continue;
+      var k = decodeURIComponent(pairs[i].slice(0, eq));
+      if (k === name) return decodeURIComponent(pairs[i].slice(eq + 1).replace(/\+/g, ' '));
+    }
+    return null;
+  }
+
+  function parse() {
+    var search = window.location.search;
+    var walkMap = parseKV(getParam(search, 'walk') || '');
+    var labelMap = parseKV(getParam(search, 'labels') || '');
+
+    var subwayRaw = getParam(search, 'subway') || '';
+    var busRaw = getParam(search, 'bus') || '';
+
+    var subwayStops = [];
+    if (subwayRaw) {
+      var ids = subwayRaw.split(',');
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i].replace(/^\s+|\s+$/g, '');
+        if (!id) continue;
+        var lastCh = id.slice(-1).toUpperCase();
+        var both = (lastCh !== 'N' && lastCh !== 'S');
+        var label = labelMap[id] || (both ? id : (id.slice(0,-1) + ' ' + (lastCh === 'N' ? 'Uptown' : 'Downtown')));
+        subwayStops.push({ id: id, type: 'subway', label: label, walkMinutes: parseInt(walkMap[id] || '0', 10) || 0, bothDirections: both });
+      }
+    }
+
+    var busStops = [];
+    if (busRaw) {
+      var ids = busRaw.split(',');
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i].replace(/^\s+|\s+$/g, '');
+        if (!id) continue;
+        busStops.push({ id: id, type: 'bus', label: labelMap[id] || ('Stop ' + id), walkMinutes: parseInt(walkMap[id] || '0', 10) || 0, bothDirections: false });
+      }
+    }
+
+    return {
+      subwayStops: subwayStops,
+      busStops: busStops,
+      maxArrivals: parseInt(getParam(search, 'n') || '4', 10) || 4,
+      busApiKey: getParam(search, 'busKey') || '',
+      proxyUrl: getParam(search, 'proxy') || 'https://corsproxy.io/?url=',
+      refreshInterval: parseInt(getParam(search, 'refresh') || '60', 10) || 60
+    };
+  }
+
+  return { parse: parse };
+})();
+
+// ============================================================
+// XHR HELPERS (Safari 5 compatible, no fetch/Promise)
+// ============================================================
+function xhrBinary(url, callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', url, true);
+  if (xhr.overrideMimeType) {
+    xhr.overrideMimeType('text/plain; charset=x-user-defined');
+  }
+  xhr.responseType = 'arraybuffer'; // Supported in Safari 5.1+
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState !== 4) return;
+    if (xhr.status !== 200) {
+      callback(new Error('HTTP ' + xhr.status), null);
+      return;
+    }
+    try {
+      var buf;
+      if (xhr.response && xhr.response instanceof ArrayBuffer) {
+        buf = new Uint8Array(xhr.response);
+      } else {
+        // Fallback: read binary string char by char
+        var rs = xhr.responseText || '';
+        buf = new Uint8Array(rs.length);
+        for (var i = 0; i < rs.length; i++) buf[i] = rs.charCodeAt(i) & 0xFF;
+      }
+      callback(null, buf);
+    } catch(e) {
+      callback(e, null);
+    }
+  };
+  xhr.onerror = function() { callback(new Error('Network error'), null); };
+  try { xhr.send(); } catch(e) { callback(e, null); }
+}
+
+function xhrJSON(url, callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', url, true);
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState !== 4) return;
+    if (xhr.status !== 200) {
+      callback(new Error('HTTP ' + xhr.status), null);
+      return;
+    }
+    try {
+      var data = typeof JSON !== 'undefined' ? JSON.parse(xhr.responseText) : eval('(' + xhr.responseText + ')');
+      callback(null, data);
+    } catch(e) {
+      callback(e, null);
+    }
+  };
+  xhr.onerror = function() { callback(new Error('Network error'), null); };
+  try { xhr.send(); } catch(e) { callback(e, null); }
+}
+
+// ============================================================
+// MTA SERVICE
+// ============================================================
+var MTA_FEED_BASE = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds';
+var BUS_SIRI_URL = 'https://bustime.mta.info/api/siri/stop-monitoring.json';
+var ALL_ALERTS_FEED = 'camsys%2Fall-alerts';
+
+function feedForStopId(id) {
+  var ch = id.charAt(0).toUpperCase();
+  if (/\d/.test(ch)) return 'nyct%2Fgtfs';
+  if (ch === 'A' || ch === 'C' || ch === 'E') return 'nyct%2Fgtfs-ace';
+  if (ch === 'B' || ch === 'D' || ch === 'F' || ch === 'M') return 'nyct%2Fgtfs-bdfm';
+  if (ch === 'G') return 'nyct%2Fgtfs-g';
+  if (ch === 'H') return 'nyct%2Fgtfs-si';
+  if (ch === 'J' || ch === 'Z') return 'nyct%2Fgtfs-jz';
+  if (ch === 'L') return 'nyct%2Fgtfs-l';
+  if (ch === 'N' || ch === 'Q' || ch === 'R' || ch === 'W') return 'nyct%2Fgtfs-nqrw';
+  return 'nyct%2Fgtfs';
+}
+
+var feedCache = {};
+var CACHE_TTL = 30000;
+
+function fetchBinary(rawUrl, proxyUrl, callback) {
+  var url = proxyUrl ? (proxyUrl + encodeURIComponent(rawUrl)) : rawUrl;
+  var now = (new Date()).getTime();
+  if (feedCache[rawUrl] && (now - feedCache[rawUrl].at) < CACHE_TTL) {
+    callback(null, feedCache[rawUrl].data);
+    return;
+  }
+  xhrBinary(url, function(err, data) {
+    if (err) { callback(err, null); return; }
+    feedCache[rawUrl] = { data: data, at: (new Date()).getTime() };
+    callback(null, data);
+  });
+}
+
+function limitPerRoute(arrivals, max) {
+  var counts = {};
+  var result = [];
+  for (var i = 0; i < arrivals.length; i++) {
+    var a = arrivals[i];
+    counts[a.routeName] = (counts[a.routeName] || 0);
+    if (counts[a.routeName] < max) {
+      result.push(a);
+      counts[a.routeName]++;
+    }
+  }
+  return result;
+}
+
+function getSubwayArrivals(stop, config, callback) {
+  var feedPath = feedForStopId(stop.id);
+  fetchBinary(MTA_FEED_BASE + '/' + feedPath, config.proxyUrl, function(err, data) {
+    if (err) { callback(err, null); return; }
+    try {
+      var feed = Proto.parseFeedMessage(data);
+      var nowSec = (new Date()).getTime() / 1000;
+      var uptownId  = stop.bothDirections ? (stop.id + 'N') : (stop.id.slice(-1) === 'N' ? stop.id : null);
+      var downtownId = stop.bothDirections ? (stop.id + 'S') : (stop.id.slice(-1) === 'S' ? stop.id : null);
+      var uptownRaw = [], downtownRaw = [];
+
+      for (var e = 0; e < feed.entities.length; e++) {
+        var entity = feed.entities[e];
+        if (!entity.tripUpdate) continue;
+        var routeId = (entity.tripUpdate.trip && entity.tripUpdate.trip.routeId) || '?';
+        var stus = entity.tripUpdate.stopTimeUpdates || [];
+        for (var s = 0; s < stus.length; s++) {
+          var stu = stus[s];
+          var sid = stu.stopId;
+          if (sid !== uptownId && sid !== downtownId) continue;
+          var arrSec = stu.arrival || stu.departure;
+          if (arrSec == null || arrSec < nowSec) continue;
+          var arrival = {
+            routeName: routeId,
+            destination: sid === uptownId ? 'Uptown' : 'Downtown',
+            arrivalTime: new Date(arrSec * 1000),
+            minutesAway: Math.round((arrSec - nowSec) / 60)
+          };
+          if (sid === uptownId) uptownRaw.push(arrival);
+          else downtownRaw.push(arrival);
+        }
+      }
+
+      uptownRaw.sort(function(a,b){ return a.arrivalTime.getTime() - b.arrivalTime.getTime(); });
+      downtownRaw.sort(function(a,b){ return a.arrivalTime.getTime() - b.arrivalTime.getTime(); });
+      var uptown = limitPerRoute(uptownRaw, config.maxArrivals);
+      var downtown = limitPerRoute(downtownRaw, config.maxArrivals);
+      callback(null, { uptown: uptown, downtown: downtown, arrivals: uptown.concat(downtown) });
+    } catch(ex) {
+      callback(ex, null);
+    }
+  });
+}
+
+function getBusArrivals(stop, config, callback) {
+  var params = 'key=' + encodeURIComponent(config.busApiKey) +
+    '&MonitoringRef=' + encodeURIComponent(stop.id) +
+    '&MaximumStopVisits=' + (config.maxArrivals + 4) +
+    '&version=2';
+  var rawUrl = BUS_SIRI_URL + '?' + params;
+  var url = config.proxyUrl ? (config.proxyUrl + encodeURIComponent(rawUrl)) : rawUrl;
+  xhrJSON(url, function(err, resp) {
+    if (err) { callback(err, null); return; }
+    try {
+      var nowSec = (new Date()).getTime() / 1000;
+      var deliveries = (resp && resp.Siri && resp.Siri.ServiceDelivery && resp.Siri.ServiceDelivery.StopMonitoringDelivery) || [];
+      var results = [];
+      for (var d = 0; d < deliveries.length; d++) {
+        var visits = deliveries[d].MonitoredStopVisit || [];
+        for (var v = 0; v < visits.length; v++) {
+          var journey = visits[v].MonitoredVehicleJourney;
+          if (!journey) continue;
+          var line = (journey.PublishedLineName && journey.PublishedLineName[0]) || journey.LineRef || '?';
+          var dest = (journey.DestinationName && journey.DestinationName[0]) || '';
+          var call = journey.MonitoredCall;
+          if (!call) continue;
+          var timeStr = call.ExpectedArrivalTime || call.AimedArrivalTime || '';
+          if (!timeStr) continue;
+          var arrTime = new Date(timeStr);
+          var arrSec = arrTime.getTime() / 1000;
+          if (arrSec < nowSec) continue;
+          results.push({ routeName: line, destination: dest, arrivalTime: arrTime, minutesAway: Math.round((arrSec - nowSec) / 60) });
+        }
+      }
+      results.sort(function(a,b){ return a.arrivalTime.getTime() - b.arrivalTime.getTime(); });
+      callback(null, results.slice(0, config.maxArrivals * 4));
+    } catch(ex) {
+      callback(ex, null);
+    }
+  });
+}
+
+function getAlerts(stopIds, routeIds, config, callback) {
+  fetchBinary(MTA_FEED_BASE + '/' + ALL_ALERTS_FEED, config.proxyUrl, function(err, data) {
+    if (err) { callback([]); return; }
+    try {
+      var feed = Proto.parseFeedMessage(data);
+      var now = (new Date()).getTime() / 1000;
+      var alerts = [];
+      for (var e = 0; e < feed.entities.length; e++) {
+        var entity = feed.entities[e];
+        if (!entity.alert) continue;
+        var alert = entity.alert;
+
+        // Check active period
+        var periods = alert.activePeriods || [];
+        if (periods.length > 0) {
+          var isActive = false;
+          for (var p = 0; p < periods.length; p++) {
+            var start = periods[p].start || 0;
+            var end = periods[p].end;
+            if (now >= start && (end == null || now <= end)) { isActive = true; break; }
+          }
+          if (!isActive) continue;
+        }
+
+        // Check relevance and MTASBWY filter
+        var relevant = false, allSubway = true;
+        var affectedRoutes = [];
+        var entities = alert.informedEntities || [];
+        for (var i = 0; i < entities.length; i++) {
+          var ie = entities[i];
+          if (ie.agencyId && ie.agencyId !== 'MTASBWY') { allSubway = false; }
+          if (ie.routeId) affectedRoutes.push(ie.routeId);
+          if (ie.stopId && stopIds[ie.stopId]) relevant = true;
+          if (ie.routeId && routeIds[ie.routeId]) relevant = true;
+        }
+        if (!relevant) continue;
+        if (!allSubway) continue;
+        if (!alert.header || !alert.header.replace(/^\s+|\s+$/g, '')) continue;
+
+        // Dedupe routes
+        var routeSet = {}, uniqRoutes = [];
+        for (var r = 0; r < affectedRoutes.length; r++) {
+          if (!routeSet[affectedRoutes[r]]) { routeSet[affectedRoutes[r]] = true; uniqRoutes.push(affectedRoutes[r]); }
+        }
+
+        alerts.push({ id: entity.id, header: alert.header, description: alert.description, affectedRoutes: uniqRoutes });
+      }
+      callback(alerts);
+    } catch(ex) {
+      callback([]);
+    }
+  });
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function el(tag, attrs, children) {
+  var e = document.createElement(tag);
+  if (attrs) {
+    for (var k in attrs) {
+      if (k === 'className') e.className = attrs[k];
+      else if (k === 'innerHTML') e.innerHTML = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+  }
+  if (children) {
+    if (typeof children === 'string') e.appendChild(document.createTextNode(children));
+    else if (children.nodeType) e.appendChild(children);
+    else for (var i = 0; i < children.length; i++) {
+      if (children[i]) {
+        if (typeof children[i] === 'string') e.appendChild(document.createTextNode(children[i]));
+        else e.appendChild(children[i]);
+      }
+    }
+  }
+  return e;
+}
+
+function formatArrival(arr, walkMinutes) {
+  var chip = document.createElement('span');
+  chip.className = 'arrival-chip' + (arr.minutesAway <= walkMinutes ? ' leave-now' : '');
+  chip.appendChild(document.createTextNode(
+    arr.minutesAway <= 0 ? 'Due' : arr.minutesAway === 1 ? '1 min' : arr.minutesAway + ' min'
+  ));
+  return chip;
+}
+
+function formatTime(date) {
+  if (!date) return '';
+  var h = date.getHours(), m = date.getMinutes();
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (!h) h = 12;
+  return h + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
+}
+
+function groupByRoute(arrivals) {
+  var map = {}, order = [];
+  for (var i = 0; i < arrivals.length; i++) {
+    var a = arrivals[i];
+    if (!map[a.routeName]) { map[a.routeName] = []; order.push(a.routeName); }
+    map[a.routeName].push(a);
+  }
+  order.sort();
+  return { map: map, routes: order };
+}
+
+function renderRouteRow(route, arrivals, walkMinutes) {
+  var badge = el('span', { className: 'route-badge' }, route);
+  var list = el('span', { className: 'arrivals-list' });
+  if (!arrivals || !arrivals.length) {
+    list.appendChild(el('span', { className: 'no-service' }, '\u2014'));
+  } else {
+    for (var i = 0; i < arrivals.length; i++) list.appendChild(formatArrival(arrivals[i], walkMinutes));
+  }
+  return el('div', { className: 'route-row' }, [badge, list]);
+}
+
+function renderCard(sa) {
+  var stop = sa.stop;
+  // Header
+  var headerChildren = [el('span', { className: 'stop-label' }, stop.label)];
+  if (stop.walkMinutes > 0) headerChildren.push(el('span', { className: 'walk-time' }, stop.walkMinutes + ' min walk'));
+  var header = el('div', { className: 'card-header' }, headerChildren);
+
+  var body;
+  if (sa.loading && !sa.lastUpdated) {
+    body = el('div', { className: 'card-body state-row' }, 'Loading...');
+  } else if (sa.error) {
+    body = el('div', { className: 'card-body state-row error' }, [
+      el('span', { className: 'error-icon' }, '!'),
+      document.createTextNode(' ' + sa.error)
+    ]);
+  } else if (stop.bothDirections) {
+    if (!sa.uptown.length && !sa.downtown.length) {
+      body = el('div', { className: 'card-body state-row' }, 'No upcoming arrivals');
+    } else {
+      var upG = groupByRoute(sa.uptown);
+      var dnG = groupByRoute(sa.downtown);
+      var allRouteSet = {}, allRoutes = [];
+      for (var i = 0; i < upG.routes.length; i++) { if (!allRouteSet[upG.routes[i]]) { allRouteSet[upG.routes[i]] = true; allRoutes.push(upG.routes[i]); } }
+      for (var i = 0; i < dnG.routes.length; i++) { if (!allRouteSet[dnG.routes[i]]) { allRouteSet[dnG.routes[i]] = true; allRoutes.push(dnG.routes[i]); } }
+      allRoutes.sort();
+
+      body = el('div', { className: 'bidir' });
+      var headRow = el('div', { className: 'bidir-row' }, [
+        el('div', { className: 'bidir-head uptown-head' }, '\u2191 Uptown'),
+        el('div', { className: 'bidir-head downtown-head' }, '\u2193 Downtown')
+      ]);
+      body.appendChild(headRow);
+      for (var r = 0; r < allRoutes.length; r++) {
+        var route = allRoutes[r];
+        var isLast = r === allRoutes.length - 1;
+        var leftCell = el('div', { className: 'bidir-cell' + (isLast ? ' last-pair' : '') });
+        var rightCell = el('div', { className: 'bidir-cell right-cell' + (isLast ? ' last-pair' : '') });
+        leftCell.appendChild(renderRouteRow(route, upG.map[route], stop.walkMinutes));
+        rightCell.appendChild(renderRouteRow(route, dnG.map[route], stop.walkMinutes));
+        var pairRow = el('div', { className: 'bidir-row' }, [leftCell, rightCell]);
+        body.appendChild(pairRow);
+      }
+    }
+  } else {
+    if (!sa.arrivals || !sa.arrivals.length) {
+      body = el('div', { className: 'card-body state-row' }, 'No upcoming arrivals');
+    } else {
+      body = el('div', { className: 'card-body' });
+      var g = groupByRoute(sa.arrivals);
+      for (var r = 0; r < g.routes.length; r++) {
+        body.appendChild(renderRouteRow(g.routes[r], g.map[g.routes[r]], stop.walkMinutes));
+      }
+    }
+  }
+
+  var children = [header, body];
+  if (sa.lastUpdated) {
+    var footerText = 'Updated ' + formatTime(sa.lastUpdated);
+    if (sa.loading) footerText += ' \u00b7 refreshing...';
+    children.push(el('div', { className: 'card-footer' }, footerText));
+  }
+
+  return el('div', { className: 'card' }, children);
+}
+
+function renderAlerts(alerts, loading) {
+  var section = el('section', { className: 'alerts-section' });
+  section.appendChild(el('h2', { className: 'alerts-heading' }, 'Service Alerts'));
+  if (loading && !alerts.length) {
+    section.appendChild(el('p', { className: 'alerts-loading' }, 'Loading alerts...'));
+  } else if (!alerts.length) {
+    section.appendChild(el('p', { className: 'no-alerts' }, 'No active service alerts.'));
+  } else {
+    for (var i = 0; i < alerts.length; i++) {
+      var a = alerts[i];
+      var item = el('div', { className: 'alert-item' });
+      if (a.affectedRoutes && a.affectedRoutes.length) {
+        var routeDiv = el('div', { className: 'alert-routes' });
+        for (var r = 0; r < a.affectedRoutes.length; r++) routeDiv.appendChild(el('span', { className: 'route-badge' }, a.affectedRoutes[r]));
+        item.appendChild(routeDiv);
+      }
+      item.appendChild(el('p', { className: 'alert-header' }, a.header));
+      if (a.description && a.description !== a.header) item.appendChild(el('p', { className: 'alert-desc' }, a.description));
+      section.appendChild(item);
+    }
+  }
+  return section;
+}
+
+function renderSetup() {
+  var base = window.location.origin + window.location.pathname;
+  var exUrl = base + '?subway=R16N,R16S&bus=308984&walk=R16N:5,R16S:5,308984:8&labels=R16N:Times+Sq+NB,R16S:Times+Sq+SB,308984:Gates+Ave&n=4&busKey=YOUR_BUS_API_KEY&proxy=https://corsproxy.io/?url=';
+  var root = document.getElementById('root');
+  root.innerHTML = '';
+  var setup = document.createElement('div');
+  setup.className = 'setup';
+  setup.innerHTML =
+    '<h1 class="setup-title">MTA Kindle Board</h1>' +
+    '<p class="setup-subtitle">No stops configured. Add query parameters to your URL to get started.</p>' +
+    '<section class="setup-section"><h2>Quick Start</h2><p>Add these parameters to the URL:</p>' +
+    '<table class="param-table"><thead><tr><th>Param</th><th>Description</th><th>Example</th></tr></thead><tbody>' +
+    '<tr><td><code>subway</code></td><td>Subway GTFS station IDs, comma-separated. Omit N/S to show both directions.</td><td><code>R16,123</code></td></tr>' +
+    '<tr><td><code>bus</code></td><td>Bus stop IDs (comma-separated)</td><td><code>308984</code></td></tr>' +
+    '<tr><td><code>walk</code></td><td>Walk time in minutes per stop</td><td><code>R16:5,308984:8</code></td></tr>' +
+    '<tr><td><code>labels</code></td><td>Custom display name per stop</td><td><code>R16:Times Sq</code></td></tr>' +
+    '<tr><td><code>n</code></td><td>Max arrivals per route (default: 4)</td><td><code>4</code></td></tr>' +
+    '<tr><td><code>busKey</code></td><td>MTA Bus Time API key</td><td><code>abc123</code></td></tr>' +
+    '<tr><td><code>proxy</code></td><td>CORS proxy URL prefix (required)</td><td><code>https://corsproxy.io/?url=</code></td></tr>' +
+    '<tr><td><code>refresh</code></td><td>Auto-refresh interval in seconds (default: 60)</td><td><code>60</code></td></tr>' +
+    '</tbody></table></section>' +
+    '<section class="setup-section"><h2>Example URL</h2><p class="example-url">' + exUrl + '</p></section>' +
+    '<section class="setup-section"><h2>Finding Stop IDs</h2><ul>' +
+    '<li><strong>Subway:</strong> Download MTA GTFS static data from mta.info/developers. Use the parent station ID (e.g. <code>R16</code>) for both directions, or append <code>N</code>/<code>S</code> for one direction.</li>' +
+    '<li><strong>Bus:</strong> Find your stop on bustime.mta.info. The numeric stop ID appears in the URL or popup.</li>' +
+    '</ul></section>' +
+    '<section class="setup-section"><h2>CORS Proxy</h2><p>MTA APIs do not allow direct browser access. You need a proxy. The simplest free option is <strong>corsproxy.io</strong> &#x2014; add <code>&amp;proxy=https://corsproxy.io/?url=</code> to your URL.</p></section>' +
+    '<section class="setup-section"><h2>Bus API Key</h2><p>Bus arrivals require a free MTA Bus Time API key. Register at <strong>bustime.mta.info/wiki/Developers/Index</strong>. Subway and alerts work without any key.</p></section>';
+  root.appendChild(setup);
+}
+
+// ============================================================
+// APP STATE & MAIN LOOP
+// ============================================================
+var appConfig = null;
+var allStops = [];
+var stopArrivals = [];
+var alerts = [];
+var alertsLoading = false;
+var lastRefresh = null;
+var refreshTimer = null;
+var pendingCount = 0;
+
+function render() {
+  var root = document.getElementById('root');
+  root.innerHTML = '';
+
+  var board = el('div', { className: 'board' });
+
+  // Header
+  var headerChildren = [el('h1', { className: 'board-title' }, 'MTA Board')];
+  if (lastRefresh) headerChildren.push(el('span', { className: 'board-updated' }, formatTime(lastRefresh)));
+  board.appendChild(el('header', { className: 'board-header' }, headerChildren));
+
+  // Cards
+  var stops = el('main', { className: 'board-stops' });
+  for (var i = 0; i < stopArrivals.length; i++) stops.appendChild(renderCard(stopArrivals[i]));
+  board.appendChild(stops);
+
+  // Alerts
+  board.appendChild(el('footer', { className: 'board-footer' }, renderAlerts(alerts, alertsLoading)));
+
+  root.appendChild(board);
+}
+
+function friendlyError(err) {
+  if (!err) return 'Unknown error';
+  var msg = err.message || String(err);
+  if (msg.indexOf('Network') >= 0 || msg.indexOf('0') >= 0) return 'Network error - check proxy setting';
+  if (msg.indexOf('403') >= 0) return '403 Forbidden - check API key';
+  if (msg.indexOf('404') >= 0) return '404 - stop ID not found';
+  return msg.slice(0, 80);
+}
+
+function fetchStop(stop, idx) {
+  if (stop.type === 'subway') {
+    getSubwayArrivals(stop, appConfig, function(err, data) {
+      if (err) {
+        stopArrivals[idx].error = friendlyError(err);
+        stopArrivals[idx].loading = false;
+      } else {
+        stopArrivals[idx].uptown = data.uptown;
+        stopArrivals[idx].downtown = data.downtown;
+        stopArrivals[idx].arrivals = data.arrivals;
+        stopArrivals[idx].loading = false;
+        stopArrivals[idx].error = null;
+        stopArrivals[idx].lastUpdated = new Date();
+      }
+      pendingCount--;
+      if (pendingCount <= 0) onAllStopsDone();
+    });
+  } else {
+    getBusArrivals(stop, appConfig, function(err, data) {
+      if (err) {
+        stopArrivals[idx].error = friendlyError(err);
+        stopArrivals[idx].loading = false;
+      } else {
+        stopArrivals[idx].arrivals = data;
+        stopArrivals[idx].uptown = [];
+        stopArrivals[idx].downtown = [];
+        stopArrivals[idx].loading = false;
+        stopArrivals[idx].error = null;
+        stopArrivals[idx].lastUpdated = new Date();
+      }
+      pendingCount--;
+      if (pendingCount <= 0) onAllStopsDone();
+    });
+  }
+}
+
+function onAllStopsDone() {
+  // Build stop/route sets for alert filtering
+  var stopIds = {}, routeIds = {};
+  for (var i = 0; i < allStops.length; i++) {
+    var s = allStops[i];
+    if (s.bothDirections) { stopIds[s.id + 'N'] = true; stopIds[s.id + 'S'] = true; }
+    else stopIds[s.id] = true;
+  }
+  for (var i = 0; i < stopArrivals.length; i++) {
+    var arrs = stopArrivals[i].arrivals || [];
+    for (var j = 0; j < arrs.length; j++) routeIds[arrs[j].routeName] = true;
+  }
+
+  alertsLoading = true;
+  render();
+
+  getAlerts(stopIds, routeIds, appConfig, function(result) {
+    alerts = result;
+    alertsLoading = false;
+    lastRefresh = new Date();
+    render();
+  });
+}
+
+function doRefresh() {
+  for (var i = 0; i < stopArrivals.length; i++) stopArrivals[i].loading = true;
+  render();
+  pendingCount = allStops.length;
+  if (pendingCount === 0) { onAllStopsDone(); return; }
+  for (var i = 0; i < allStops.length; i++) fetchStop(allStops[i], i);
+}
+
+function init() {
+  appConfig = Config.parse();
+  allStops = appConfig.subwayStops.concat(appConfig.busStops);
+
+  if (!allStops.length) { renderSetup(); return; }
+
+  stopArrivals = [];
+  for (var i = 0; i < allStops.length; i++) {
+    stopArrivals.push({ stop: allStops[i], arrivals: [], uptown: [], downtown: [], loading: true, error: null, lastUpdated: null });
+  }
+
+  doRefresh();
+  refreshTimer = setInterval(doRefresh, appConfig.refreshInterval * 1000);
+}
+
+// Wait for DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener ? document.addEventListener('DOMContentLoaded', init) : document.attachEvent('onreadystatechange', function(){ if(document.readyState === 'complete') init(); });
+} else {
+  init();
+}
+</script>
+</body>
+</html>
