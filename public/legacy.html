@@ -11,7 +11,7 @@ body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,Bli
 a{color:#000}
 
 /* Board layout */
-.board{max-width:620px;margin:0 auto;padding:8px}
+.board{max-width:600px;margin:0 auto;padding:8px}
 .board-header{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:baseline;-webkit-align-items:baseline;align-items:baseline;-webkit-box-pack:justify;-webkit-justify-content:space-between;justify-content:space-between;border-bottom:3px solid #000;padding-bottom:4px;margin-bottom:10px}
 .board-title{font-size:1.2rem;font-weight:bold;margin:0;letter-spacing:.04em;text-transform:uppercase}
 .board-updated{font-size:.78rem;color:#555}
@@ -22,7 +22,7 @@ a{color:#000}
 .card{border:2px solid #000;margin-bottom:12px;background:#fff}
 .card-header{display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-pack:justify;-webkit-justify-content:space-between;justify-content:space-between;-webkit-box-align:baseline;-webkit-align-items:baseline;align-items:baseline;padding:6px 10px;border-bottom:2px solid #000;background:#000;color:#fff}
 .stop-label{font-size:1rem;font-weight:bold;letter-spacing:.02em}
-.walk-time{font-size:.8rem;font-weight:normal;opacity:.85}
+.walk-time{font-size:.8rem;font-weight:normal;opacity:.85;float:right}
 .state-row{padding:8px 10px;font-style:italic;color:#555}
 .state-row.error{color:#000;font-weight:bold;font-style:normal;background:repeating-linear-gradient(45deg,#fff,#fff 4px,#eee 4px,#eee 8px)}
 .error-icon{display:inline-block;width:1.1em;height:1.1em;line-height:1.1em;text-align:center;border:2px solid #000;border-radius:50%;font-weight:bold;margin-right:4px}
@@ -403,38 +403,66 @@ var Config = (function() {
 })();
 
 // ============================================================
-// XHR HELPERS (Safari 5 compatible, no fetch/Promise)
+// XHR HELPERS (Safari 5 / WebKit compatible - plain arrays, no Uint8Array required)
 // ============================================================
 function xhrBinary(url, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  if (xhr.overrideMimeType) {
-    xhr.overrideMimeType('text/plain; charset=x-user-defined');
-  }
-  xhr.responseType = 'arraybuffer'; // Supported in Safari 5.1+
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) return;
-    if (xhr.status !== 200) {
-      callback(new Error('HTTP ' + xhr.status), null);
-      return;
-    }
-    try {
-      var buf;
-      if (xhr.response && xhr.response instanceof ArrayBuffer) {
-        buf = new Uint8Array(xhr.response);
-      } else {
-        // Fallback: read binary string char by char
-        var rs = xhr.responseText || '';
-        buf = new Uint8Array(rs.length);
-        for (var i = 0; i < rs.length; i++) buf[i] = rs.charCodeAt(i) & 0xFF;
+  // Returns a plain JS Array of byte values - works even without Uint8Array/ArrayBuffer.
+  // Tries arraybuffer responseType first (faster), falls back to overrideMimeType binary
+  // string which works on all WebKit versions including Safari 5.0.
+
+  function responseToByteArray(xhr) {
+    // ArrayBuffer path
+    if (xhr.response && typeof ArrayBuffer !== 'undefined' && xhr.response instanceof ArrayBuffer) {
+      if (typeof DataView !== 'undefined') {
+        var dv = new DataView(xhr.response);
+        var arr = [], i;
+        for (i = 0; i < dv.byteLength; i++) arr.push(dv.getUint8(i));
+        return arr;
       }
-      callback(null, buf);
-    } catch(e) {
-      callback(e, null);
+      if (typeof Uint8Array !== 'undefined') {
+        var u8 = new Uint8Array(xhr.response);
+        var arr = [], i;
+        for (i = 0; i < u8.length; i++) arr.push(u8[i]);
+        return arr;
+      }
     }
-  };
-  xhr.onerror = function() { callback(new Error('Network error'), null); };
-  try { xhr.send(); } catch(e) { callback(e, null); }
+    // Binary string path (overrideMimeType makes responseText carry raw bytes as Latin-1)
+    var rs = xhr.responseText || '';
+    var arr = [], i;
+    for (i = 0; i < rs.length; i++) arr.push(rs.charCodeAt(i) & 0xFF);
+    return arr;
+  }
+
+  function doRequest(useArrayBuffer) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    if (!useArrayBuffer && xhr.overrideMimeType) {
+      xhr.overrideMimeType('text/plain; charset=x-user-defined');
+    }
+    if (useArrayBuffer) {
+      try { xhr.responseType = 'arraybuffer'; } catch(e) { /* not supported - will fall back */ }
+    }
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status !== 200) {
+        callback(new Error('HTTP ' + xhr.status), null);
+        return;
+      }
+      try {
+        callback(null, responseToByteArray(xhr));
+      } catch(e) {
+        callback(e, null);
+      }
+    };
+    xhr.onerror = function() {
+      if (useArrayBuffer) { doRequest(false); } else { callback(new Error('Network error'), null); }
+    };
+    try { xhr.send(); } catch(e) {
+      if (useArrayBuffer) { doRequest(false); } else { callback(e, null); }
+    }
+  }
+
+  doRequest(typeof ArrayBuffer !== 'undefined');
 }
 
 function xhrJSON(url, callback) {
