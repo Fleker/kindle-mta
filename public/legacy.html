@@ -988,6 +988,18 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+
+// ---- Keep-awake: tiny DOM touch every 30s to prevent Kindle sleep ----
+(function() {
+  var ticker = document.createElement('span');
+  ticker.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;opacity:0';
+  document.body.appendChild(ticker);
+  var count = 0;
+  setInterval(function() {
+    ticker.setAttribute('data-k', ++count);
+  }, 30000);
+})();
+// ---- end keep-awake ----
 </script>
 </body>
 </html>
